@@ -1,22 +1,4 @@
-# Railway Deployment - Backend Only
-[build]
-  builder = "nixpacks"
-
-[build.buildCommand]
-  value = "cd backend && pip install -r requirements.txt"
-
-[deploy]
-  startCommand = "cd backend && python main.py"
-
-[env]
-  PORT = { default = "8000" }
-  PYTHONPATH = { default = "/app/backend" }
-  
-# Railway will auto-detect Python and set these up
-# You'll need to set these in Railway dashboard:
-# SECRET_KEY - your JWT secret
-# DATABASE_URL - provided by Railway PostgreSQL  
-# STRIPE_SECRET_KEY - your Stripe secret key
-# ADMIN_EMAIL - your admin email
+# Railway will auto-detect Python from backend folder
+# Just set the root directory to 'backend' in Railway dashboard
 # SMTP_SERVER, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD - email config
 # FRONTEND_URL - your Netlify frontend URL
