@@ -1,0 +1,19 @@
+runtime: python-3.10
+
+# Railway configuration
+services:
+  - name: backend
+    source: backend/
+    build:
+      buildCommand: pip install -r requirements.txt
+    start: python main.py
+    variables:
+      SECRET_KEY: ${{ SECRET_KEY }}
+      DATABASE_URL: ${{ DATABASE_URL }}
+      STRIPE_SECRET_KEY: ${{ STRIPE_SECRET_KEY }}
+      ADMIN_EMAIL: ${{ ADMIN_EMAIL }}
+      SMTP_SERVER: ${{ SMTP_SERVER }}
+      SMTP_PORT: ${{ SMTP_PORT }}
+      SMTP_USERNAME: ${{ SMTP_USERNAME }}
+      SMTP_PASSWORD: ${{ SMTP_PASSWORD }}
+      FRONTEND_URL: ${{ FRONTEND_URL }}

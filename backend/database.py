@@ -1,0 +1,98 @@
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, inspect, text
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+from datetime import datetime
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./ai_gen.db")
+
+# Create engine with SQLite-specific args only when using SQLite
+if DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False},
+        pool_pre_ping=True,
+    )
+else:
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,
+    )
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+Base = declarative_base()
+
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    credits = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class AIRequest(Base):
+    __tablename__ = "ai_requests"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=False)
+    request_type = Column(String, nullable=False)  # Text, Image, Code
+    model = Column(String, nullable=False)
+    prompt = Column(Text, nullable=False)
+    delivery_email = Column(String, nullable=False)
+    filename = Column(String, nullable=True)  # uploaded file
+    status = Column(String, default="Pending")  # Pending or Completed
+    admin_response = Column(String, nullable=True)
+    admin_file = Column(String, nullable=True)  # admin uploaded file
+    created_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+
+class Purchase(Base):
+    __tablename__ = "purchases"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=False)
+    stripe_session_id = Column(String, nullable=False)
+    credits_purchased = Column(Integer, nullable=False)
+    amount_paid = Column(Float, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+# Create tables
+Base.metadata.create_all(bind=engine)
+
+# Ensure columns exist (SQLite migration)
+if DATABASE_URL.startswith("sqlite"):
+    try:
+        inspector = inspect(engine)
+        columns = [col['name'] for col in inspector.get_columns('ai_requests')]
+
+        migrations = []
+        if 'status' not in columns:
+            migrations.append("ALTER TABLE ai_requests ADD COLUMN status TEXT DEFAULT 'Pending';")
+        if 'admin_response' not in columns:
+            migrations.append("ALTER TABLE ai_requests ADD COLUMN admin_response TEXT;")
+        if 'admin_file' not in columns:
+            migrations.append("ALTER TABLE ai_requests ADD COLUMN admin_file TEXT;")
+        if 'completed_at' not in columns:
+            migrations.append("ALTER TABLE ai_requests ADD COLUMN completed_at DATETIME;")
+
+        if migrations:
+            with engine.begin() as conn:  # begin() will commit automatically
+                for stmt in migrations:
+                    conn.execute(text(stmt))
+            print(f"Applied migrations to ai_requests: {migrations}")
+    except Exception as e:
+        # Do not crash app if inspection/migration fails; just log
+        print(f"Migration check failed: {e}")
+
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
