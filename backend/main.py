@@ -19,10 +19,13 @@ from email_service import send_ai_request_email
 
 app = FastAPI(title="AI Generation Platform", version="1.0.0")
 
-# CORS middleware
+# Load environment variables needed for CORS early
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
+
+# CORS middleware (allow production frontend and local dev)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[FRONTEND_URL, "http://localhost:3000", "https://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -30,7 +33,6 @@ app.add_middleware(
 
 # Load environment variables
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 # Validate Stripe configuration
 print(f"Stripe module: {stripe}")
