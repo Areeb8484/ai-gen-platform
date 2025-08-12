@@ -8,6 +8,8 @@ import os
 import aiofiles
 from typing import Optional
 from dotenv import load_dotenv
+from fastapi.responses import FileResponse
+from datetime import datetime
 
 # Load environment variables first
 load_dotenv()
@@ -15,7 +17,7 @@ load_dotenv()
 from database import get_db, User, AIRequest, Purchase
 from schemas import UserCreate, UserLogin, Token, User as UserSchema, AIRequestCreate, AIRequestResponse, CreditPackage, StripeSessionCreate, RequestStatusUpdate
 from auth import verify_password, get_password_hash, create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
-from email_service import send_ai_request_email
+from email_service import send_ai_request_email, send_completion_notification
 
 app = FastAPI(title="AI Generation Platform", version="1.0.0")
 
@@ -404,7 +406,10 @@ async def get_all_requests(
             "filename": request.filename,
             "created_at": request.created_at,
             "status": request.status,
-            "user_email": user.email if user else "Unknown"
+            "user_email": user.email if user else "Unknown",
+            "admin_response": request.admin_response,
+            "admin_file": request.admin_file,
+            "completed_at": request.completed_at,
         }
         result.append(request_dict)
     
@@ -427,12 +432,98 @@ async def update_request_status(
     req = db.query(AIRequest).filter(AIRequest.id == request_id).first()
     if not req:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Request not found")
-    new_status = status_update.status
-    if new_status not in ["Pending", "Completed"]:
+    new_status = (status_update.status or "").strip()
+    allowed = {"pending", "in_progress", "completed", "failed", "Pending", "Completed"}
+    if new_status not in allowed:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status")
     req.status = new_status
+    if new_status.lower() == "completed":
+        req.completed_at = datetime.utcnow()
     db.commit()
     return {"id": req.id, "status": req.status}
+
+@app.post("/admin/requests/{request_id}/submit-result")
+async def submit_admin_result(
+    request_id: int,
+    response_text: Optional[str] = Form(None),
+    status_value: Optional[str] = Form(None, alias="status"),
+    file: Optional[UploadFile] = File(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Admin submits result (optional text + optional file). Sends email to user."""
+    if not is_admin(current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied. Admin privileges required.")
+
+    req = db.query(AIRequest).filter(AIRequest.id == request_id).first()
+    if not req:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Request not found")
+
+    # Save optional response text
+    if response_text is not None and response_text.strip():
+        req.admin_response = response_text.strip()
+
+    # Save optional file
+    saved_path = None
+    if file is not None:
+        os.makedirs("admin_uploads", exist_ok=True)
+        safe_name = f"{request_id}_{file.filename}"
+        saved_path = os.path.join("admin_uploads", safe_name)
+        # Write file to disk
+        async with aiofiles.open(saved_path, "wb") as out:
+            content = await file.read()
+            await out.write(content)
+        req.admin_file = saved_path
+
+    # Update status
+    final_status = (status_value or "completed").strip()
+    allowed = {"pending", "in_progress", "completed", "failed", "Pending", "Completed"}
+    if final_status not in allowed:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status")
+    req.status = final_status
+    if final_status.lower() == "completed":
+        req.completed_at = datetime.utcnow()
+
+    db.commit()
+
+    # Notify user via email
+    try:
+        # Prefer delivery_email if present, otherwise user's account email
+        user = db.query(User).filter(User.id == req.user_id).first()
+        recipient = req.delivery_email or (user.email if user else None)
+        if recipient:
+            send_completion_notification(
+                user_email=recipient,
+                request_type=req.request_type,
+                prompt=req.prompt,
+                admin_response=req.admin_response,
+                admin_file=req.admin_file,
+            )
+    except Exception as e:
+        print(f"Failed to send completion email: {e}")
+
+    return {"message": "Result submitted successfully", "id": req.id, "status": req.status}
+
+@app.get("/admin/download/{request_id}")
+async def download_admin_file(
+    request_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Admin downloads the stored result file for a request."""
+    if not is_admin(current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied. Admin privileges required.")
+
+    req = db.query(AIRequest).filter(AIRequest.id == request_id).first()
+    if not req or not req.admin_file:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+
+    file_path = req.admin_file
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+
+    filename = os.path.basename(file_path)
+    return FileResponse(path=file_path, filename=filename)
 
 @app.get("/debug/email")
 async def debug_email(
