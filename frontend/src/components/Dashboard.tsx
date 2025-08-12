@@ -12,7 +12,7 @@ interface UserRequest {
   model: string;
   prompt: string;
   delivery_email: string;
-  filename: string | null;
+  filenames: string[];  // Changed to array
   created_at: string;
   status: string;
   admin_response?: string;
@@ -225,10 +225,16 @@ const Dashboard: React.FC = () => {
                   <p className="text-sm text-white bg-slate-700/50 px-3 py-2 rounded-md">{selectedRequest.delivery_email}</p>
                 </div>
 
-                {selectedRequest.filename && (
+                {selectedRequest.filenames && selectedRequest.filenames.length > 0 && (
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-300 mb-1">Uploaded File</label>
-                    <p className="text-sm text-white bg-slate-700/50 px-3 py-2 rounded-md">{selectedRequest.filename}</p>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Uploaded Files</label>
+                    <div className="bg-slate-700/50 px-3 py-2 rounded-md">
+                      {selectedRequest.filenames.map((filename, index) => (
+                        <p key={index} className="text-sm text-white">
+                          {index + 1}. {filename}
+                        </p>
+                      ))}
+                    </div>
                   </div>
                 )}
 

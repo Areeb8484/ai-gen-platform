@@ -7,7 +7,7 @@ const AIRequestForm: React.FC = () => {
   const [model, setModel] = useState('GPT-3.5-Turbo');
   const [prompt, setPrompt] = useState('');
   const [deliveryEmail, setDeliveryEmail] = useState('');
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
@@ -49,15 +49,16 @@ const AIRequestForm: React.FC = () => {
       formData.append('prompt', prompt);
       formData.append('delivery_email', deliveryEmail);
       
-      if (file) {
-        formData.append('file', file);
-      }
+      // Append all files
+      files.forEach((file, index) => {
+        formData.append('files', file);
+      });
 
       await aiAPI.submitRequest(formData);
       
       setSuccess('Request submitted successfully! Check your email for delivery.');
       setPrompt('');
-      setFile(null);
+      setFiles([]);
       
       // Update user credits
       await updateUser();
@@ -70,16 +71,26 @@ const AIRequestForm: React.FC = () => {
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      // Check file type
+    const selectedFiles = Array.from(e.target.files || []);
+    if (selectedFiles.length > 0) {
+      // Check file types
       const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'text/plain'];
-      if (!allowedTypes.includes(selectedFile.type)) {
+      const invalidFiles = selectedFiles.filter(file => !allowedTypes.includes(file.type));
+      
+      if (invalidFiles.length > 0) {
         setError('Please upload only PDF, image, or text files');
         return;
       }
-      setFile(selectedFile);
+      
+      // Add new files to existing files
+      setFiles(prevFiles => [...prevFiles, ...selectedFiles]);
+      // Clear the input to allow selecting same file again
+      e.target.value = '';
     }
+  };
+
+  const removeFile = (index: number) => {
+    setFiles(prevFiles => prevFiles.filter((_, i) => i !== index));
   };
 
   return (
@@ -166,11 +177,33 @@ const AIRequestForm: React.FC = () => {
             type="file"
             onChange={handleFileChange}
             accept=".pdf,.jpg,.jpeg,.png,.gif,.txt"
+            multiple
             className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-cyan-500 file:text-white hover:file:bg-cyan-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
           />
           <p className="text-sm text-gray-400 mt-1">
-            Supported: PDF, images (JPG, PNG, GIF), text files
+            Supported: PDF, images (JPG, PNG, GIF), text files. Click to add multiple files.
           </p>
+          
+          {/* Display selected files */}
+          {files.length > 0 && (
+            <div className="mt-3 space-y-2">
+              <p className="text-sm font-medium text-gray-300">Selected Files:</p>
+              {files.map((file, index) => (
+                <div key={index} className="flex items-center justify-between bg-slate-700/30 px-3 py-2 rounded border border-slate-600">
+                  <span className="text-sm text-gray-300 truncate flex-1">
+                    {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeFile(index)}
+                    className="ml-2 text-red-400 hover:text-red-300 text-sm font-medium"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div>

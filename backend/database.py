@@ -44,7 +44,7 @@ class AIRequest(Base):
     model = Column(String, nullable=False)
     prompt = Column(Text, nullable=False)
     delivery_email = Column(String, nullable=False)
-    filename = Column(String, nullable=True)  # uploaded file
+    filename = Column(Text, nullable=True)  # JSON array of uploaded filenames
     status = Column(String, default="Pending")  # Pending or Completed
     admin_response = Column(String, nullable=True)
     admin_file = Column(String, nullable=True)  # admin uploaded file
@@ -79,6 +79,13 @@ if DATABASE_URL.startswith("sqlite"):
             migrations.append("ALTER TABLE ai_requests ADD COLUMN admin_file TEXT;")
         if 'completed_at' not in columns:
             migrations.append("ALTER TABLE ai_requests ADD COLUMN completed_at DATETIME;")
+        
+        # Check if filename column needs to be expanded to TEXT (for JSON storage)
+        filename_col = next((col for col in inspector.get_columns('ai_requests') if col['name'] == 'filename'), None)
+        if filename_col and str(filename_col.get('type')).upper() != 'TEXT':
+            # SQLite doesn't support ALTER COLUMN, so we'd need to recreate table
+            # For now, just log it - new deployments will use TEXT
+            print("Note: filename column should be TEXT for JSON storage")
 
         if migrations:
             with engine.begin() as conn:  # begin() will commit automatically

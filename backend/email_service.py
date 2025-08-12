@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def send_ai_request_email(user_email: str, request_type: str, model: str, prompt: str, 
-                         delivery_email: str, file_path: str = None):
+                         delivery_email: str, file_path: str = None, all_file_paths: list = None):
     """Send AI request details to admin email"""
     
     smtp_server = os.getenv("SMTP_SERVER")
@@ -45,17 +45,19 @@ Please process this request and send the result to: {delivery_email}
         
         msg.attach(MIMEText(body, 'plain'))
         
-        # Attach file if provided
-        if file_path and os.path.exists(file_path):
-            with open(file_path, "rb") as attachment:
-                part = MIMEBase('application', 'octet-stream')
-                part.set_payload(attachment.read())
-                encoders.encode_base64(part)
-                part.add_header(
-                    'Content-Disposition',
-                    f'attachment; filename= {os.path.basename(file_path)}'
-                )
-                msg.attach(part)
+        # Attach all files if provided
+        file_paths_to_attach = all_file_paths if all_file_paths else ([file_path] if file_path else [])
+        for fp in file_paths_to_attach:
+            if fp and os.path.exists(fp):
+                with open(fp, "rb") as attachment:
+                    part = MIMEBase('application', 'octet-stream')
+                    part.set_payload(attachment.read())
+                    encoders.encode_base64(part)
+                    part.add_header(
+                        'Content-Disposition',
+                        f'attachment; filename= {os.path.basename(fp)}'
+                    )
+                    msg.attach(part)
         
         server = smtplib.SMTP(smtp_server, smtp_port)
         server.starttls()

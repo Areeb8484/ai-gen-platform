@@ -6,7 +6,8 @@ from datetime import timedelta
 import stripe
 import os
 import aiofiles
-from typing import Optional
+import json
+from typing import Optional, List
 from dotenv import load_dotenv
 from fastapi.responses import FileResponse
 from datetime import datetime
@@ -281,14 +282,13 @@ async def verify_payment(session_id: str, db: Session = Depends(get_db)):
             detail=str(e)
         )
 
-# AI request endpoints
 @app.post("/ai/request", response_model=AIRequestResponse)
 async def submit_ai_request(
     request_type: str = Form(...),
     model: str = Form(...),
     prompt: str = Form(...),
     delivery_email: str = Form(...),
-    file: Optional[UploadFile] = File(None),
+    files: List[UploadFile] = File(default=[]),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -306,20 +306,25 @@ async def submit_ai_request(
             detail="Invalid request type"
         )
     
-    filename = None
-    file_path = None
+    filenames = []
+    file_paths = []
     
-    # Handle file upload
-    if file:
+    # Handle multiple file uploads
+    if files:
         # Create uploads directory if it doesn't exist
         os.makedirs("uploads", exist_ok=True)
         
-        filename = file.filename
-        file_path = f"uploads/{current_user.id}_{filename}"
-        
-        async with aiofiles.open(file_path, 'wb') as f:
-            content = await file.read()
-            await f.write(content)
+        for file in files:
+            if file.filename:  # Skip empty file uploads
+                safe_filename = f"{current_user.id}_{len(filenames)}_{file.filename}"
+                file_path = f"uploads/{safe_filename}"
+                
+                async with aiofiles.open(file_path, 'wb') as f:
+                    content = await file.read()
+                    await f.write(content)
+                
+                filenames.append(file.filename)
+                file_paths.append(file_path)
     
     # Create AI request record
     ai_request = AIRequest(
@@ -328,7 +333,7 @@ async def submit_ai_request(
         model=model,
         prompt=prompt,
         delivery_email=delivery_email,
-        filename=filename
+        filename=json.dumps(filenames) if filenames else None  # Store as JSON
     )
     
     db.add(ai_request)
@@ -339,14 +344,15 @@ async def submit_ai_request(
     db.commit()
     db.refresh(ai_request)
     
-    # Send email to admin
+    # Send email to admin (pass first file path for compatibility)
     email_sent = send_ai_request_email(
         user_email=current_user.email,
         request_type=request_type,
         model=model,
         prompt=prompt,
         delivery_email=delivery_email,
-        file_path=file_path
+        file_path=file_paths[0] if file_paths else None,
+        all_file_paths=file_paths  # Pass all files
     )
     
     if not email_sent:
@@ -366,15 +372,24 @@ async def get_user_requests(
     ).order_by(AIRequest.created_at.desc()).all()
     result = []
     for req in requests:
+        # Parse filenames from JSON
+        try:
+            filenames = json.loads(req.filename) if req.filename else []
+        except:
+            filenames = [req.filename] if req.filename else []
+        
         result.append({
             "id": req.id,
             "request_type": req.request_type,
             "model": req.model,
             "prompt": req.prompt,
             "delivery_email": req.delivery_email,
-            "filename": req.filename,
+            "filenames": filenames,  # Now returns array
             "created_at": req.created_at,
-            "status": req.status
+            "status": req.status,
+            "admin_response": req.admin_response,
+            "admin_file": req.admin_file,
+            "completed_at": req.completed_at
         })
     return result
 
@@ -397,13 +412,20 @@ async def get_all_requests(
     result = []
     for request in requests:
         user = db.query(User).filter(User.id == request.user_id).first()
+        
+        # Parse filenames from JSON
+        try:
+            filenames = json.loads(request.filename) if request.filename else []
+        except:
+            filenames = [request.filename] if request.filename else []
+        
         request_dict = {
             "id": request.id,
             "request_type": request.request_type,
             "model": request.model,
             "prompt": request.prompt,
             "delivery_email": request.delivery_email,
-            "filename": request.filename,
+            "filenames": filenames,  # Now returns array
             "created_at": request.created_at,
             "status": request.status,
             "user_email": user.email if user else "Unknown",

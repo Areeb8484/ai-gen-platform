@@ -9,7 +9,7 @@ interface AIRequest {
   request_type: string;
   model: string;
   prompt: string;
-  file_name?: string;
+  filenames?: string[];  // Changed to array
   status: string;
   created_at: string;
   admin_response?: string;
@@ -428,12 +428,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                   </div>
                 </div>
 
-                {selectedRequest.file_name && (
+                {selectedRequest.filenames && selectedRequest.filenames.length > 0 && (
                   <div>
-                    <p className="text-sm font-medium text-gray-300">Attached File</p>
-                    <p className="text-sm text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 px-2 py-1 rounded inline-block mt-1">
-                      {selectedRequest.file_name}
-                    </p>
+                    <p className="text-sm font-medium text-gray-300">Attached Files</p>
+                    <div className="mt-1">
+                      {selectedRequest.filenames.map((filename, index) => (
+                        <p key={index} className="text-sm text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 px-2 py-1 rounded inline-block mr-2 mb-1">
+                          {filename}
+                        </p>
+                      ))}
+                    </div>
                   </div>
                 )}
 
