@@ -9,3 +9,4 @@ stripe==8.2.0
 emails==0.6.0
 pydantic[email]==2.5.0
 aiofiles==23.2.0
+psycopg2-binary==2.9.9
