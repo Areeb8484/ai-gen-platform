@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
+import SupportWidget from './SupportWidget';
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -93,6 +94,9 @@ const LoginPage: React.FC = () => {
         </p>
         </div>
       </div>
+      
+      {/* Support Widget */}
+      <SupportWidget />
     </div>
   );
 };

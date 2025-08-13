@@ -361,3 +361,82 @@ def send_completion_notification(user_email: str, request_type: str, prompt: str
     except Exception as e:
         print(f"Failed to send completion notification: {e}")
         return False
+
+def send_support_email(user_email: str, message: str, page: str = "/", timestamp: str = None):
+    """Send support/help message from user to admin"""
+    
+    smtp_server = os.getenv("SMTP_SERVER")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_username = os.getenv("SMTP_USERNAME")
+    smtp_password = os.getenv("SMTP_PASSWORD")
+    admin_email = os.getenv("ADMIN_EMAIL")
+    
+    if not all([smtp_server, smtp_username, smtp_password, admin_email]):
+        print("Email configuration not complete")
+        return False
+    
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = smtp_username
+        msg['To'] = admin_email
+        msg['Subject'] = f"🆘 Support Request from {user_email}"
+        
+        # Create HTML email template
+        html_body = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }}
+                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                .header {{ background: linear-gradient(135deg, #f59e0b, #ef4444); color: white; padding: 25px; text-align: center; border-radius: 10px 10px 0 0; }}
+                .content {{ background: #f8fafc; padding: 30px; border-radius: 0 0 10px 10px; }}
+                .info-box {{ background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #f59e0b; margin: 20px 0; }}
+                .message-box {{ background: #fef3c7; padding: 20px; border-radius: 8px; border-left: 4px solid #f59e0b; margin: 20px 0; }}
+                .footer {{ text-align: center; margin-top: 30px; color: #666; font-size: 14px; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>🆘 Support Request</h1>
+                    <p>User needs assistance</p>
+                </div>
+                
+                <div class="content">
+                    <div class="info-box">
+                        <h3>📋 Contact Information:</h3>
+                        <p><strong>📧 Email:</strong> {user_email}</p>
+                        <p><strong>📍 Page:</strong> {page}</p>
+                        {f'<p><strong>🕐 Time:</strong> {timestamp}</p>' if timestamp else ''}
+                    </div>
+                    
+                    <div class="message-box">
+                        <h3>💬 User Message:</h3>
+                        <p style="background: white; padding: 15px; border-radius: 5px; white-space: pre-wrap;">{message}</p>
+                    </div>
+                    
+                    <p><strong>Action Required:</strong> Please respond to the user at <a href="mailto:{user_email}">{user_email}</a></p>
+                    
+                    <div class="footer">
+                        <p>This is an automated support notification from AI Gen Platform.</p>
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        msg.attach(MIMEText(html_body, 'html'))
+        
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(smtp_username, smtp_password)
+        text = msg.as_string()
+        server.sendmail(smtp_username, admin_email, text)
+        server.quit()
+        
+        return True
+    except Exception as e:
+        print(f"Failed to send support email: {e}")
+        return False

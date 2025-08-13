@@ -56,6 +56,8 @@ class StripeSessionCreate(BaseModel):
 class RequestStatusUpdate(BaseModel):
     status: str
 
-class AdminResponse(BaseModel):
-    response_text: Optional[str] = None
-    status: str = "Completed"
+class SupportMessage(BaseModel):
+    email: EmailStr
+    message: str
+    page: str = "/"
+    timestamp: Optional[str] = None

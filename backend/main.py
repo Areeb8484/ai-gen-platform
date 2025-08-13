@@ -11,12 +11,11 @@ from typing import Optional, List
 from dotenv import load_dotenv
 from fastapi.responses import FileResponse
 from datetime import datetime
-
 # Load environment variables first
 load_dotenv()
 
 from database import get_db, User, AIRequest, Purchase
-from schemas import UserCreate, UserLogin, Token, User as UserSchema, AIRequestCreate, AIRequestResponse, CreditPackage, StripeSessionCreate, RequestStatusUpdate
+from schemas import UserCreate, UserLogin, Token, User as UserSchema, AIRequestCreate, AIRequestResponse, CreditPackage, StripeSessionCreate, RequestStatusUpdate, SupportMessage
 from auth import verify_password, get_password_hash, create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
 from email_service import send_ai_request_email, send_completion_notification
 
@@ -561,6 +560,34 @@ async def debug_email(
         file_path=None
     )
     return {"email_sent": success}
+
+@app.post("/support/contact")
+async def contact_support(support_msg: SupportMessage):
+    """Handle support/help messages from users"""
+    try:
+        from email_service import send_support_email
+        
+        # Send support email to admin
+        email_sent = send_support_email(
+            user_email=support_msg.email,
+            message=support_msg.message,
+            page=support_msg.page,
+            timestamp=support_msg.timestamp
+        )
+        
+        if email_sent:
+            return {"message": "Support message sent successfully"}
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to send support message"
+            )
+    except Exception as e:
+        print(f"Support message error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send support message"
+        )
 
 if __name__ == "__main__":
     import uvicorn

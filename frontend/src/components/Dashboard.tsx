@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../AuthContext';
 import AIRequestForm from './AIRequestForm';
 import BuyCredits from './BuyCredits';
+import SupportWidget from './SupportWidget';
 import { aiAPI } from '../api';
 import { Eye, Download } from 'lucide-react';
 
@@ -292,6 +293,9 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       )}
+      
+      {/* Support Widget */}
+      <SupportWidget />
     </div>
   );
 };
