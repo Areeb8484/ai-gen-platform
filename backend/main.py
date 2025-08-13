@@ -640,6 +640,32 @@ async def submit_admin_result(
 
     return {"message": "Result submitted successfully", "id": req.id, "status": req.status}
 
+@app.get("/download/{request_id}")
+async def download_user_file(
+    request_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """User downloads the admin-provided file for their completed request."""
+    req = db.query(AIRequest).filter(AIRequest.id == request_id).first()
+    if not req:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Request not found")
+    
+    # Check user ownership - user can only download files from their own requests
+    if req.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied. You can only download files from your own requests.")
+    
+    # Check if file exists
+    if not req.admin_file:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No file available for this request")
+    
+    file_path = req.admin_file
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found on server")
+
+    filename = os.path.basename(file_path)
+    return FileResponse(path=file_path, filename=filename)
+
 @app.get("/admin/download/{request_id}")
 async def download_admin_file(
     request_id: int,

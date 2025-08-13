@@ -88,7 +88,7 @@ export const aiAPI = {
     }),
   
   downloadFile: (id: number) =>
-    api.get(`/admin/download/${id}`, { responseType: 'blob' }),
+    api.get(`/download/${id}`, { responseType: 'blob' }),
 };
 
 export default api;

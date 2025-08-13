@@ -108,9 +108,32 @@ const Dashboard: React.FC = () => {
 
   const downloadFile = async (requestId: number) => {
     try {
-      await aiAPI.downloadFile(requestId);
+      const response = await aiAPI.downloadFile(requestId);
+      
+      // Create blob URL and download
+      const blob = new Blob([response.data]);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Try to get filename from response headers
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = `download_${requestId}`;
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="(.+)"/);
+        if (match) {
+          filename = match[1];
+        }
+      }
+      
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
     } catch (err: any) {
       console.error('Failed to download file:', err);
+      alert('Failed to download file. Please try again or contact support.');
     }
   };
 
