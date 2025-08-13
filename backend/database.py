@@ -66,53 +66,94 @@ class Purchase(Base):
 # Create tables
 Base.metadata.create_all(bind=engine)
 
-# Ensure columns exist (SQLite migration)
-if DATABASE_URL.startswith("sqlite"):
+# Database migration - works for both SQLite and PostgreSQL
+def migrate_database():
+    """Apply database migrations for both SQLite and PostgreSQL"""
     try:
         inspector = inspect(engine)
-        columns = [col['name'] for col in inspector.get_columns('users')]
-        user_columns = [col['name'] for col in inspector.get_columns('users')]
         
-        user_migrations = []
-        if 'reset_token' not in user_columns:
-            user_migrations.append("ALTER TABLE users ADD COLUMN reset_token TEXT;")
-        if 'reset_token_expires' not in user_columns:
-            user_migrations.append("ALTER TABLE users ADD COLUMN reset_token_expires DATETIME;")
+        # Check if tables exist, if not, create_all will handle it
+        tables = inspector.get_table_names()
+        if not tables:
+            print("No tables found, create_all will handle initial table creation")
+            return
         
-        if user_migrations:
-            with engine.begin() as conn:
-                for stmt in user_migrations:
-                    conn.execute(text(stmt))
-            print(f"Applied migrations to users: {user_migrations}")
-
-        # Check ai_requests table columns
-        ai_request_columns = [col['name'] for col in inspector.get_columns('ai_requests')]
-
-        migrations = []
-        if 'status' not in ai_request_columns:
-            migrations.append("ALTER TABLE ai_requests ADD COLUMN status TEXT DEFAULT 'Pending';")
-        if 'admin_response' not in ai_request_columns:
-            migrations.append("ALTER TABLE ai_requests ADD COLUMN admin_response TEXT;")
-        if 'admin_file' not in ai_request_columns:
-            migrations.append("ALTER TABLE ai_requests ADD COLUMN admin_file TEXT;")
-        if 'completed_at' not in ai_request_columns:
-            migrations.append("ALTER TABLE ai_requests ADD COLUMN completed_at DATETIME;")
+        is_sqlite = DATABASE_URL.startswith("sqlite")
+        is_postgresql = DATABASE_URL.startswith("postgresql") or "postgres" in DATABASE_URL.lower()
         
-        # Check if filename column needs to be expanded to TEXT (for JSON storage)
-        filename_col = next((col for col in inspector.get_columns('ai_requests') if col['name'] == 'filename'), None)
-        if filename_col and str(filename_col.get('type')).upper() != 'TEXT':
-            # SQLite doesn't support ALTER COLUMN, so we'd need to recreate table
-            # For now, just log it - new deployments will use TEXT
-            print("Note: filename column should be TEXT for JSON storage")
+        print(f"Running migrations for database type: {'SQLite' if is_sqlite else 'PostgreSQL' if is_postgresql else 'Unknown'}")
+        
+        # Migrate users table
+        if 'users' in tables:
+            user_columns = [col['name'] for col in inspector.get_columns('users')]
+            user_migrations = []
+            
+            if 'reset_token' not in user_columns:
+                if is_sqlite:
+                    user_migrations.append("ALTER TABLE users ADD COLUMN reset_token TEXT;")
+                elif is_postgresql:
+                    user_migrations.append("ALTER TABLE users ADD COLUMN reset_token VARCHAR;")
+                    
+            if 'reset_token_expires' not in user_columns:
+                if is_sqlite:
+                    user_migrations.append("ALTER TABLE users ADD COLUMN reset_token_expires DATETIME;")
+                elif is_postgresql:
+                    user_migrations.append("ALTER TABLE users ADD COLUMN reset_token_expires TIMESTAMP;")
+            
+            if user_migrations:
+                with engine.begin() as conn:
+                    for stmt in user_migrations:
+                        conn.execute(text(stmt))
+                print(f"Applied user table migrations: {user_migrations}")
 
-        if migrations:
-            with engine.begin() as conn:  # begin() will commit automatically
-                for stmt in migrations:
-                    conn.execute(text(stmt))
-            print(f"Applied migrations to ai_requests: {migrations}")
+        # Migrate ai_requests table
+        if 'ai_requests' in tables:
+            ai_request_columns = [col['name'] for col in inspector.get_columns('ai_requests')]
+            migrations = []
+            
+            if 'status' not in ai_request_columns:
+                if is_sqlite:
+                    migrations.append("ALTER TABLE ai_requests ADD COLUMN status TEXT DEFAULT 'Pending';")
+                elif is_postgresql:
+                    migrations.append("ALTER TABLE ai_requests ADD COLUMN status VARCHAR DEFAULT 'Pending';")
+                    
+            if 'admin_response' not in ai_request_columns:
+                if is_sqlite:
+                    migrations.append("ALTER TABLE ai_requests ADD COLUMN admin_response TEXT;")
+                elif is_postgresql:
+                    migrations.append("ALTER TABLE ai_requests ADD COLUMN admin_response TEXT;")
+                    
+            if 'admin_file' not in ai_request_columns:
+                if is_sqlite:
+                    migrations.append("ALTER TABLE ai_requests ADD COLUMN admin_file TEXT;")
+                elif is_postgresql:
+                    migrations.append("ALTER TABLE ai_requests ADD COLUMN admin_file VARCHAR;")
+                    
+            if 'completed_at' not in ai_request_columns:
+                if is_sqlite:
+                    migrations.append("ALTER TABLE ai_requests ADD COLUMN completed_at DATETIME;")
+                elif is_postgresql:
+                    migrations.append("ALTER TABLE ai_requests ADD COLUMN completed_at TIMESTAMP;")
+            
+            # Check if filename column needs to be expanded to TEXT (for JSON storage)
+            filename_col = next((col for col in inspector.get_columns('ai_requests') if col['name'] == 'filename'), None)
+            if filename_col and str(filename_col.get('type')).upper() not in ['TEXT', 'VARCHAR']:
+                print(f"Note: filename column type is {filename_col.get('type')}, should be TEXT/VARCHAR for JSON storage")
+
+            if migrations:
+                with engine.begin() as conn:
+                    for stmt in migrations:
+                        conn.execute(text(stmt))
+                print(f"Applied ai_requests table migrations: {migrations}")
+                
     except Exception as e:
         # Do not crash app if inspection/migration fails; just log
         print(f"Migration check failed: {e}")
+        import traceback
+        traceback.print_exc()
+
+# Run migrations after table creation
+migrate_database()
 
 
 def get_db():
