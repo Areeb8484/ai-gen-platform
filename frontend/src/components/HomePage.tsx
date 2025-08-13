@@ -155,7 +155,7 @@ const HomePage: React.FC = () => {
               animate={heroInView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 1, delay: 0.5 }}
             >
-              <h1 className="text-7xl md:text-9xl font-black mb-6 relative">
+              <h1 className="text-5xl md:text-9xl font-black mb-6 relative">
                 <span className="relative bg-gradient-to-r from-white via-cyan-200 to-purple-200 bg-clip-text text-transparent">
                   {TYPING_WORDS[currentWord].substring(0, currentChar)}
                   <motion.span
