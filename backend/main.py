@@ -96,22 +96,37 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
 
 @app.post("/auth/login", response_model=Token)
 async def login(user: UserLogin, db: Session = Depends(get_db)):
-    # Authenticate user
-    db_user = db.query(User).filter(User.email == user.email).first()
-    if not db_user or not verify_password(user.password, db_user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
+    """User login endpoint"""
+    try:
+        # Authenticate user
+        db_user = db.query(User).filter(User.email == user.email).first()
+        if not db_user or not verify_password(user.password, db_user.hashed_password):
+            print(f"Failed login attempt for email: {user.email}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect email or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        # Create access token
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user.email}, expires_delta=access_token_expires
         )
-    
-    # Create access token
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.email}, expires_delta=access_token_expires
-    )
-    
-    return {"access_token": access_token, "token_type": "bearer"}
+        
+        print(f"Successful login for user: {user.email}")
+        return {"access_token": access_token, "token_type": "bearer"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Unexpected error during login for {user.email}: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred during login"
+        )
 
 @app.get("/auth/me", response_model=UserSchema)
 async def get_current_user_info(current_user: User = Depends(get_current_user)):
@@ -127,59 +142,89 @@ async def get_admin_status(
 @app.post("/auth/forgot-password")
 async def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
     """Generate and send password reset email"""
-    # Find user by email
-    user = db.query(User).filter(User.email == request.email).first()
-    
-    # Always return success to prevent email enumeration attacks
-    # Don't reveal whether the email exists or not
-    if user:
-        try:
-            # Generate reset token
-            reset_token = create_reset_token(user, db)
-            
-            # Send password reset email
-            email_sent = send_password_reset_email(user.email, reset_token)
-            
-            if not email_sent:
-                print(f"Failed to send password reset email to {user.email}")
-        except Exception as e:
-            print(f"Error processing password reset for {request.email}: {e}")
-    
-    # Always return the same response for security
-    return {"message": "If an account with that email exists, a password reset link has been sent."}
+    try:
+        # Find user by email
+        user = db.query(User).filter(User.email == request.email).first()
+        
+        # Always return success to prevent email enumeration attacks
+        # Don't reveal whether the email exists or not
+        if user:
+            try:
+                # Generate reset token
+                reset_token = create_reset_token(user, db)
+                print(f"Generated reset token for user: {user.email}")
+                
+                # Send password reset email
+                email_sent = send_password_reset_email(user.email, reset_token)
+                
+                if not email_sent:
+                    print(f"Failed to send password reset email to {user.email}")
+                else:
+                    print(f"Password reset email sent to {user.email}")
+            except Exception as e:
+                print(f"Error processing password reset for {request.email}: {e}")
+                import traceback
+                traceback.print_exc()
+        else:
+            print(f"Password reset requested for non-existent email: {request.email}")
+        
+        # Always return the same response for security
+        return {"message": "If an account with that email exists, a password reset link has been sent."}
+        
+    except Exception as e:
+        print(f"Unexpected error in forgot password for {request.email}: {e}")
+        import traceback
+        traceback.print_exc()
+        # Still return success to prevent information disclosure
+        return {"message": "If an account with that email exists, a password reset link has been sent."}
 
 @app.post("/auth/reset-password")
 async def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
     """Reset password using token"""
-    # Verify the reset token
-    user = verify_reset_token(request.token, db)
-    
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or expired reset token"
-        )
-    
-    # Validate password strength (minimum 6 characters)
-    if len(request.new_password) < 6:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password must be at least 6 characters long"
-        )
-    
-    # Update password
-    user.hashed_password = get_password_hash(request.new_password)
-    
-    # Clear reset token
-    clear_reset_token(user, db)
-    
-    # Send confirmation email
     try:
-        send_password_change_confirmation_email(user.email)
+        # Verify the reset token
+        user = verify_reset_token(request.token, db)
+        
+        if not user:
+            print(f"Invalid or expired reset token used")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired reset token"
+            )
+        
+        # Validate password strength (minimum 6 characters)
+        if len(request.new_password) < 6:
+            print(f"Password too short for user: {user.email}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Password must be at least 6 characters long"
+            )
+        
+        # Update password
+        user.hashed_password = get_password_hash(request.new_password)
+        
+        # Clear reset token
+        clear_reset_token(user, db)
+        
+        # Send confirmation email
+        try:
+            send_password_change_confirmation_email(user.email)
+            print(f"Password reset successful for user: {user.email}")
+        except Exception as e:
+            print(f"Failed to send password change confirmation email: {e}")
+        
+        return {"message": "Password successfully reset"}
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"Failed to send password change confirmation email: {e}")
-    
-    return {"message": "Password successfully reset"}
+        print(f"Unexpected error during password reset: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred during password reset"
+        )
 
 @app.get("/auth/verify-reset-token")
 async def verify_reset_token_endpoint(token: str, db: Session = Depends(get_db)):
