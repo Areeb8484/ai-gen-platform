@@ -34,6 +34,8 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     credits = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
+    reset_token = Column(String, nullable=True)
+    reset_token_expires = Column(DateTime, nullable=True)
 
 class AIRequest(Base):
     __tablename__ = "ai_requests"
@@ -68,16 +70,32 @@ Base.metadata.create_all(bind=engine)
 if DATABASE_URL.startswith("sqlite"):
     try:
         inspector = inspect(engine)
-        columns = [col['name'] for col in inspector.get_columns('ai_requests')]
+        columns = [col['name'] for col in inspector.get_columns('users')]
+        user_columns = [col['name'] for col in inspector.get_columns('users')]
+        
+        user_migrations = []
+        if 'reset_token' not in user_columns:
+            user_migrations.append("ALTER TABLE users ADD COLUMN reset_token TEXT;")
+        if 'reset_token_expires' not in user_columns:
+            user_migrations.append("ALTER TABLE users ADD COLUMN reset_token_expires DATETIME;")
+        
+        if user_migrations:
+            with engine.begin() as conn:
+                for stmt in user_migrations:
+                    conn.execute(text(stmt))
+            print(f"Applied migrations to users: {user_migrations}")
+
+        # Check ai_requests table columns
+        ai_request_columns = [col['name'] for col in inspector.get_columns('ai_requests')]
 
         migrations = []
-        if 'status' not in columns:
+        if 'status' not in ai_request_columns:
             migrations.append("ALTER TABLE ai_requests ADD COLUMN status TEXT DEFAULT 'Pending';")
-        if 'admin_response' not in columns:
+        if 'admin_response' not in ai_request_columns:
             migrations.append("ALTER TABLE ai_requests ADD COLUMN admin_response TEXT;")
-        if 'admin_file' not in columns:
+        if 'admin_file' not in ai_request_columns:
             migrations.append("ALTER TABLE ai_requests ADD COLUMN admin_file TEXT;")
-        if 'completed_at' not in columns:
+        if 'completed_at' not in ai_request_columns:
             migrations.append("ALTER TABLE ai_requests ADD COLUMN completed_at DATETIME;")
         
         # Check if filename column needs to be expanded to TEXT (for JSON storage)

@@ -61,3 +61,13 @@ class SupportMessage(BaseModel):
     message: str
     page: str = "/"
     timestamp: Optional[str] = None
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+class VerifyResetTokenRequest(BaseModel):
+    token: str

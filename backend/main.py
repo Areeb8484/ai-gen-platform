@@ -15,9 +15,9 @@ from datetime import datetime
 load_dotenv()
 
 from database import get_db, User, AIRequest, Purchase
-from schemas import UserCreate, UserLogin, Token, User as UserSchema, AIRequestCreate, AIRequestResponse, CreditPackage, StripeSessionCreate, RequestStatusUpdate, SupportMessage
-from auth import verify_password, get_password_hash, create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
-from email_service import send_ai_request_email, send_completion_notification
+from schemas import UserCreate, UserLogin, Token, User as UserSchema, AIRequestCreate, AIRequestResponse, CreditPackage, StripeSessionCreate, RequestStatusUpdate, SupportMessage, ForgotPasswordRequest, ResetPasswordRequest, VerifyResetTokenRequest
+from auth import verify_password, get_password_hash, create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES, create_reset_token, verify_reset_token, clear_reset_token
+from email_service import send_ai_request_email, send_completion_notification, send_password_reset_email, send_password_change_confirmation_email
 
 app = FastAPI(title="AI Generation Platform", version="1.0.0")
 
@@ -123,6 +123,76 @@ async def get_admin_status(
 ):
     """Check if current user has admin privileges"""
     return {"is_admin": is_admin(current_user)}
+
+@app.post("/auth/forgot-password")
+async def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """Generate and send password reset email"""
+    # Find user by email
+    user = db.query(User).filter(User.email == request.email).first()
+    
+    # Always return success to prevent email enumeration attacks
+    # Don't reveal whether the email exists or not
+    if user:
+        try:
+            # Generate reset token
+            reset_token = create_reset_token(user, db)
+            
+            # Send password reset email
+            email_sent = send_password_reset_email(user.email, reset_token)
+            
+            if not email_sent:
+                print(f"Failed to send password reset email to {user.email}")
+        except Exception as e:
+            print(f"Error processing password reset for {request.email}: {e}")
+    
+    # Always return the same response for security
+    return {"message": "If an account with that email exists, a password reset link has been sent."}
+
+@app.post("/auth/reset-password")
+async def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """Reset password using token"""
+    # Verify the reset token
+    user = verify_reset_token(request.token, db)
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token"
+        )
+    
+    # Validate password strength (minimum 6 characters)
+    if len(request.new_password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 6 characters long"
+        )
+    
+    # Update password
+    user.hashed_password = get_password_hash(request.new_password)
+    
+    # Clear reset token
+    clear_reset_token(user, db)
+    
+    # Send confirmation email
+    try:
+        send_password_change_confirmation_email(user.email)
+    except Exception as e:
+        print(f"Failed to send password change confirmation email: {e}")
+    
+    return {"message": "Password successfully reset"}
+
+@app.get("/auth/verify-reset-token")
+async def verify_reset_token_endpoint(token: str, db: Session = Depends(get_db)):
+    """Validate reset token without using it"""
+    user = verify_reset_token(token, db)
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token"
+        )
+    
+    return {"valid": True, "email": user.email}
 
 # Credit system endpoints
 @app.get("/credits/packages")
