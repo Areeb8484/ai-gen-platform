@@ -4,7 +4,7 @@ import { useAuth } from '../AuthContext';
 
 const AIRequestForm: React.FC = () => {
   const [requestType, setRequestType] = useState('Text');
-  const [model, setModel] = useState('GPT-3.5-Turbo');
+  const [model, setModel] = useState('GPT-5');
   const [prompt, setPrompt] = useState('');
   const [deliveryEmail, setDeliveryEmail] = useState('');
   const [files, setFiles] = useState<File[]>([]);
@@ -17,11 +17,11 @@ const AIRequestForm: React.FC = () => {
   // Update model when request type changes
   useEffect(() => {
     if (requestType === 'Image') {
-      // Set DALL-E 3 for images
-      setModel('DALL-E-3');
-    } else if (model === '' || model === 'DALL-E-3') {
-      // Default to GPT-3.5-Turbo for text/code
-      setModel('GPT-3.5-Turbo');
+      // Set Default for images
+      setModel('Default');
+    } else if (model === '' || model === 'Default') {
+      // Default to GPT-5 for text/code
+      setModel('GPT-5');
     }
   }, [requestType, model]);
 
@@ -36,8 +36,8 @@ const AIRequestForm: React.FC = () => {
     }
 
     // Auto-set model for image requests
-    if (requestType === 'Image' && model !== 'DALL-E-3') {
-      setModel('DALL-E-3');
+    if (requestType === 'Image' && model !== 'Default') {
+      setModel('Default');
     }
 
     setLoading(true);
@@ -137,20 +137,16 @@ const AIRequestForm: React.FC = () => {
           >
             {requestType === 'Text' && (
               <>
-                <option value="GPT-3.5-Turbo">GPT-3.5 Turbo</option>
-                <option value="GPT-4">GPT-4</option>
-                <option value="GPT-4-Turbo">GPT-4 Turbo</option>
+                <option value="GPT-3.5-Turbo">GPT-5</option>
               </>
             )}
             {requestType === 'Code' && (
               <>
-                <option value="GPT-3.5-Turbo">GPT-3.5 Turbo</option>
-                <option value="GPT-4">GPT-4</option>
-                <option value="GPT-4-Turbo">GPT-4 Turbo</option>
+                <option value="GPT-3.5-Turbo">GPT-5</option>
               </>
             )}
             {requestType === 'Image' && (
-              <option value="DALL-E-3">DALL-E 3</option>
+              <option value="Default">Default</option>
             )}
           </select>
         </div>
