@@ -159,7 +159,7 @@ const HomePage: React.FC = () => {
                 <span className="relative bg-gradient-to-r from-white via-cyan-200 to-purple-200 bg-clip-text text-transparent">
                   {TYPING_WORDS[currentWord].substring(0, currentChar)}
                   <motion.span
-                    className="inline-block w-1 h-20 md:h-28 bg-cyan-400 ml-2"
+                    className="inline-block w-1 h-11 md:h-28 bg-cyan-400 ml-2"
                     animate={{ opacity: [1, 0] }}
                     transition={{ duration: 1, repeat: Infinity }}
                   />
