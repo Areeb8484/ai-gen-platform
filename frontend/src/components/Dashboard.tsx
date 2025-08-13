@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../AuthContext';
 import AIRequestForm from './AIRequestForm';
 import BuyCredits from './BuyCredits';
