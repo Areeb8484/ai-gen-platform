@@ -440,3 +440,189 @@ def send_support_email(user_email: str, message: str, page: str = "/", timestamp
     except Exception as e:
         print(f"Failed to send support email: {e}")
         return False
+
+def send_password_reset_email(user_email: str, reset_token: str):
+    """Send password reset email with secure reset link"""
+    
+    smtp_server = os.getenv("SMTP_SERVER")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_username = os.getenv("SMTP_USERNAME")
+    smtp_password = os.getenv("SMTP_PASSWORD")
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    
+    if not all([smtp_server, smtp_username, smtp_password]):
+        print("Email configuration not complete")
+        return False
+    
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = smtp_username
+        msg['To'] = user_email
+        msg['Subject'] = "🔐 Password Reset Request - AI Gen Platform"
+        
+        reset_link = f"{frontend_url}/reset-password?token={reset_token}"
+        
+        # Create HTML email template
+        html_body = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }}
+                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                .header {{ background: linear-gradient(135deg, #06b6d4, #8b5cf6); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
+                .content {{ background: #f8fafc; padding: 30px; border-radius: 0 0 10px 10px; }}
+                .security-box {{ background: #fef3c7; padding: 20px; border-radius: 8px; border-left: 4px solid #f59e0b; margin: 20px 0; }}
+                .reset-box {{ background: white; padding: 25px; border-radius: 8px; border-left: 4px solid #06b6d4; margin: 20px 0; text-align: center; }}
+                .button {{ display: inline-block; background: linear-gradient(135deg, #06b6d4, #8b5cf6); color: white; padding: 15px 35px; text-decoration: none; border-radius: 25px; font-weight: bold; margin: 20px 0; }}
+                .footer {{ text-align: center; margin-top: 30px; color: #666; font-size: 14px; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>🔐 Password Reset Request</h1>
+                    <p>AI Gen Platform</p>
+                </div>
+                
+                <div class="content">
+                    <h2>Hello! 👋</h2>
+                    
+                    <p>We received a request to reset your password for your AI Gen Platform account. If you made this request, please click the button below to reset your password:</p>
+                    
+                    <div class="reset-box">
+                        <h3>🔄 Reset Your Password</h3>
+                        <p>Click the button below to set a new password:</p>
+                        <a href="{reset_link}" class="button">Reset Password</a>
+                        <p style="color: #666; font-size: 14px; margin-top: 15px;">This link will expire in 1 hour for security reasons.</p>
+                    </div>
+                    
+                    <div class="security-box">
+                        <h3>🛡️ Security Notice</h3>
+                        <p><strong>If you didn't request this password reset:</strong></p>
+                        <ul>
+                            <li>Your account is still secure</li>
+                            <li>You can safely ignore this email</li>
+                            <li>No changes will be made to your account</li>
+                        </ul>
+                    </div>
+                    
+                    <p>For security reasons, this reset link will expire in <strong>1 hour</strong>. If you need to reset your password after this time, please request a new reset link.</p>
+                    
+                    <p style="color: #666; font-size: 14px;">If the button above doesn't work, you can copy and paste this link into your browser:</p>
+                    <p style="word-break: break-all; background: #f1f5f9; padding: 10px; border-radius: 5px; font-family: monospace; font-size: 12px;">{reset_link}</p>
+                    
+                    <div class="footer">
+                        <p>Best regards,<br>The AI Gen Security Team</p>
+                        <p><small>This is an automated security notification.</small></p>
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        msg.attach(MIMEText(html_body, 'html'))
+        
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(smtp_username, smtp_password)
+        text = msg.as_string()
+        server.sendmail(smtp_username, user_email, text)
+        server.quit()
+        
+        return True
+    except Exception as e:
+        print(f"Failed to send password reset email: {e}")
+        return False
+
+def send_password_change_confirmation_email(user_email: str):
+    """Send confirmation email after successful password change"""
+    
+    smtp_server = os.getenv("SMTP_SERVER")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_username = os.getenv("SMTP_USERNAME")
+    smtp_password = os.getenv("SMTP_PASSWORD")
+    
+    if not all([smtp_server, smtp_username, smtp_password]):
+        print("Email configuration not complete")
+        return False
+    
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = smtp_username
+        msg['To'] = user_email
+        msg['Subject'] = "✅ Password Successfully Changed - AI Gen Platform"
+        
+        # Create HTML email template
+        html_body = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }}
+                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                .header {{ background: linear-gradient(135deg, #10b981, #06b6d4); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
+                .content {{ background: #f8fafc; padding: 30px; border-radius: 0 0 10px 10px; }}
+                .success-box {{ background: #d1fae5; padding: 20px; border-radius: 8px; border-left: 4px solid #10b981; margin: 20px 0; }}
+                .security-box {{ background: #fef3c7; padding: 20px; border-radius: 8px; border-left: 4px solid #f59e0b; margin: 20px 0; }}
+                .button {{ display: inline-block; background: linear-gradient(135deg, #10b981, #06b6d4); color: white; padding: 12px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; margin: 20px 0; }}
+                .footer {{ text-align: center; margin-top: 30px; color: #666; font-size: 14px; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>✅ Password Changed Successfully</h1>
+                    <p>AI Gen Platform</p>
+                </div>
+                
+                <div class="content">
+                    <div class="success-box">
+                        <h3>🎉 Success!</h3>
+                        <p>Your password has been successfully changed for your AI Gen Platform account.</p>
+                    </div>
+                    
+                    <h2>Hello! 👋</h2>
+                    
+                    <p>This email confirms that your password was successfully reset on <strong>{datetime.now().strftime("%B %d, %Y at %I:%M %p")}</strong>.</p>
+                    
+                    <p>You can now log in to your account with your new password:</p>
+                    
+                    <a href="{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/login" class="button">Login to Your Account</a>
+                    
+                    <div class="security-box">
+                        <h3>🛡️ Security Notice</h3>
+                        <p><strong>If you didn't make this change:</strong></p>
+                        <ul>
+                            <li>Please contact our support team immediately</li>
+                            <li>Someone may have unauthorized access to your account</li>
+                            <li>We recommend reviewing your account security</li>
+                        </ul>
+                    </div>
+                    
+                    <p>Thank you for keeping your AI Gen Platform account secure!</p>
+                    
+                    <div class="footer">
+                        <p>Best regards,<br>The AI Gen Security Team</p>
+                        <p><small>This is an automated security notification.</small></p>
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        msg.attach(MIMEText(html_body, 'html'))
+        
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(smtp_username, smtp_password)
+        text = msg.as_string()
+        server.sendmail(smtp_username, user_email, text)
+        server.quit()
+        
+        return True
+    except Exception as e:
+        print(f"Failed to send password change confirmation email: {e}")
+        return False

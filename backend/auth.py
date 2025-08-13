@@ -6,6 +6,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from database import get_db, User
 import os
+import secrets
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -60,3 +61,40 @@ def get_current_user(email: str = Depends(verify_token), db: Session = Depends(g
             headers={"WWW-Authenticate": "Bearer"},
         )
     return user
+
+def generate_reset_token():
+    """Generate a secure random token for password reset"""
+    return secrets.token_urlsafe(32)
+
+def create_reset_token(user: User, db: Session):
+    """Create and store a password reset token for the user"""
+    reset_token = generate_reset_token()
+    reset_token_expires = datetime.utcnow() + timedelta(hours=1)  # 1 hour expiration
+    
+    user.reset_token = reset_token
+    user.reset_token_expires = reset_token_expires
+    db.commit()
+    
+    return reset_token
+
+def verify_reset_token(token: str, db: Session):
+    """Verify reset token and return user if valid"""
+    user = db.query(User).filter(User.reset_token == token).first()
+    
+    if not user:
+        return None
+    
+    if not user.reset_token_expires or user.reset_token_expires < datetime.utcnow():
+        # Token has expired, clear it
+        user.reset_token = None
+        user.reset_token_expires = None
+        db.commit()
+        return None
+    
+    return user
+
+def clear_reset_token(user: User, db: Session):
+    """Clear the reset token after successful password reset"""
+    user.reset_token = None
+    user.reset_token_expires = None
+    db.commit()

@@ -42,6 +42,15 @@ export const authAPI = {
   getMe: () => api.get('/auth/me'),
   
   getAdminStatus: () => api.get('/auth/admin-status'),
+  
+  forgotPassword: (email: string) =>
+    api.post('/auth/forgot-password', { email }),
+  
+  resetPassword: (token: string, new_password: string) =>
+    api.post('/auth/reset-password', { token, new_password }),
+  
+  verifyResetToken: (token: string) =>
+    api.get('/auth/verify-reset-token', { params: { token } }),
 };
 
 // Credits API

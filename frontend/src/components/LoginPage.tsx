@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import SupportWidget from './SupportWidget';
 
@@ -8,9 +8,20 @@ const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
   
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    // Check if there's a success message from password reset
+    if (location.state?.message) {
+      setSuccessMessage(location.state.message);
+      // Clear the state to prevent the message from persisting on refresh
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,6 +55,12 @@ const LoginPage: React.FC = () => {
         <div className="bg-slate-800/50 backdrop-blur-sm p-8 rounded-lg shadow-2xl border border-slate-700 w-full max-w-md">
         <h2 className="text-2xl font-bold text-center mb-6 text-white">Login</h2>
         
+        {successMessage && (
+          <div className="bg-green-500/20 border border-green-500/50 text-green-400 px-4 py-3 rounded mb-4">
+            {successMessage}
+          </div>
+        )}
+        
         {error && (
           <div className="bg-red-500/20 border border-red-500/50 text-red-400 px-4 py-3 rounded mb-4">
             {error}
@@ -75,6 +92,14 @@ const LoginPage: React.FC = () => {
               className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700/50 text-white placeholder-gray-400 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
               required
             />
+            <div className="flex justify-end mt-2">
+              <Link 
+                to="/forgot-password" 
+                className="text-sm text-cyan-400 hover:text-cyan-300 hover:underline"
+              >
+                Forgot Password?
+              </Link>
+            </div>
           </div>
           
           <button
