@@ -9,16 +9,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def _create_smtp_connection(smtp_server: str, smtp_port: int):
-    """Create SMTP connection based on port - SSL for 465, STARTTLS for others"""
-    if smtp_port == 465:
-        # IONOS and other providers that require SSL on port 465
-        return smtplib.SMTP_SSL(smtp_server, smtp_port)
-    else:
-        # Standard SMTP with STARTTLS (port 587 and others)
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
-        return server
 
 def send_ai_request_email(user_email: str, request_type: str, model: str, prompt: str, 
                          delivery_email: str, file_path: str = None, all_file_paths: list = None):
@@ -70,7 +60,8 @@ Please process this request and send the result to: {delivery_email}
                     )
                     msg.attach(part)
         
-        server = _create_smtp_connection(smtp_server, smtp_port)
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
         server.login(smtp_username, smtp_password)
         text = msg.as_string()
         server.sendmail(smtp_username, admin_email, text)
@@ -159,7 +150,8 @@ def send_welcome_email(user_email: str, user_name: str = None):
         
         msg.attach(MIMEText(html_body, 'html'))
         
-        server = _create_smtp_connection(smtp_server, smtp_port)
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
         server.login(smtp_username, smtp_password)
         text = msg.as_string()
         server.sendmail(smtp_username, user_email, text)
@@ -244,8 +236,8 @@ def send_login_notification(user_email: str, login_time: datetime = None, ip_add
         
         msg.attach(MIMEText(html_body, 'html'))
         
-        server = _create_smtp_connection(smtp_server, smtp_port)
-
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
         server.login(smtp_username, smtp_password)
         text = msg.as_string()
         server.sendmail(smtp_username, user_email, text)
@@ -359,7 +351,8 @@ def send_completion_notification(user_email: str, request_type: str, prompt: str
             except Exception as e:
                 print(f"Failed to attach file: {e}")
         
-        server = _create_smtp_connection(smtp_server, smtp_port)
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
 
         server.login(smtp_username, smtp_password)
         text = msg.as_string()
@@ -438,7 +431,8 @@ def send_support_email(user_email: str, message: str, page: str = "/", timestamp
         
         msg.attach(MIMEText(html_body, 'html'))
         
-        server = _create_smtp_connection(smtp_server, smtp_port)
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
 
         server.login(smtp_username, smtp_password)
         text = msg.as_string()
@@ -533,7 +527,8 @@ def send_password_reset_email(user_email: str, reset_token: str):
         
         msg.attach(MIMEText(html_body, 'html'))
         
-        server = _create_smtp_connection(smtp_server, smtp_port)
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
 
         server.login(smtp_username, smtp_password)
         text = msg.as_string()
@@ -624,7 +619,8 @@ def send_password_change_confirmation_email(user_email: str):
         
         msg.attach(MIMEText(html_body, 'html'))
         
-        server = _create_smtp_connection(smtp_server, smtp_port)
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
 
         server.login(smtp_username, smtp_password)
         text = msg.as_string()
